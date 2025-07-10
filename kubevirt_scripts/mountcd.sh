@@ -24,7 +24,7 @@ if [[ -r /var/tmp/kubeconfig ]]; then
 fi
 
 
-CLUSTER_STORAGE_CLASS=$(oc get storageclass | awk '/(default)/ {print $1}')
+CLUSTER_STORAGE_CLASS=$(oc get storageclass --insecure-skip-tls-verify=true | awk '/(default)/ {print $1}')
 if [ $? -ne 0 ]; then
   echo "Failed to get default cluster's storage class."
   exit 1
@@ -60,7 +60,7 @@ if echo ${ISO} | grep -q https://; then
 fi
 
 # we need to poweroff the VM if it's running
-VM_WAS_RUNNING=$(oc -n ${VM_NAMESPACE} get vm ${VM_NAME} -o jsonpath='{.spec.running}')
+VM_WAS_RUNNING=$(oc -n ${VM_NAMESPACE} get vm ${VM_NAME} --insecure-skip-tls-verify=true -o jsonpath='{.spec.running}')
 if [ $? -ne 0 ]; then
   echo "Failed to get VM power state."
   exit 1
@@ -75,14 +75,14 @@ if [ ${IS_HTTPS} == "true" ]; then
   # We don't care about delete configmap return
   # if it fails it's likely because it didn't exist
   # we will fail on create if something is wrong with it
-  oc -n ${VM_NAMESPACE} delete configmap ${VM_NAME}-iso-ca &> /dev/null
-  oc -n ${VM_NAMESPACE} create configmap ${VM_NAME}-iso-ca --from-file=ca.crt=/tmp/iso-endpoint-ca.crt
+  oc -n ${VM_NAMESPACE} --insecure-skip-tls-verify=true delete configmap ${VM_NAME}-iso-ca &> /dev/null
+  oc -n ${VM_NAMESPACE} --insecure-skip-tls-verify=true create configmap ${VM_NAME}-iso-ca --from-file=ca.crt=/tmp/iso-endpoint-ca.crt
   if [ $? -ne 0 ]; then
     echo "Failed to create configmap with https server cert."
     exit 1
   fi
 
-  cat <<EOF | oc apply -f -
+  cat <<EOF | oc apply --insecure-skip-tls-verify=true -f -
   apiVersion: v1
   kind: PersistentVolumeClaim
   metadata:
@@ -99,7 +99,7 @@ EOF
     exit 1
   fi
 else
-  cat <<EOF | oc apply -f -
+  cat <<EOF | oc apply --insecure-skip-tls-verify=true -f -
   apiVersion: v1
   kind: PersistentVolumeClaim
   metadata:
@@ -116,7 +116,7 @@ EOF
   fi
 fi
 
-STATUS=$(oc -n ${VM_NAMESPACE} get pvc ${VM_NAME}-bootiso -o jsonpath='{.metadata.annotations.cdi\.kubevirt\.io/storage\.condition\.running\.message}')
+STATUS=$(oc -n ${VM_NAMESPACE} get pvc ${VM_NAME}-bootiso --insecure-skip-tls-verify=true -o jsonpath='{.metadata.annotations.cdi\.kubevirt\.io/storage\.condition\.running\.message}')
 if [ $? -ne 0 ]; then
   echo "Failed to get CDI import state."
   exit 1
@@ -133,14 +133,14 @@ do
     exit 1
   fi
   echo "Waiting for ISO to be imported [${WAIT}/${MAX_WAIT}]"
-  STATUS=$(oc -n ${VM_NAMESPACE} get pvc ${VM_NAME}-bootiso -o jsonpath='{.metadata.annotations.cdi\.kubevirt\.io/storage\.condition\.running\.message}')
+  STATUS=$(oc -n ${VM_NAMESPACE} get pvc ${VM_NAME}-bootiso --insecure-skip-tls-verify=true -o jsonpath='{.metadata.annotations.cdi\.kubevirt\.io/storage\.condition\.running\.message}')
   if [ $? -ne 0 ]; then
     echo "Failed to get CDI import state."
     exit 1
   fi
 done
 
-NUM_VOLUMES=$(oc -n ${VM_NAMESPACE} get vm ${VM_NAME} -o jsonpath='{.spec.template.spec.volumes[*].name}' | tr " " ";" | { grep -o ";" || true; } | wc -l)
+NUM_VOLUMES=$(oc -n ${VM_NAMESPACE} get vm ${VM_NAME} --insecure-skip-tls-verify=true -o jsonpath='{.spec.template.spec.volumes[*].name}' | tr " " ";" | { grep -o ";" || true; } | wc -l)
 if [ $? -ne 0 ]; then
   echo "Failed to get VM volumes."
   exit 1
@@ -162,14 +162,14 @@ cat <<EOF > /tmp/${VM_NAME}.patch
 EOF
 
 # Add it to VM object if it doesn't exist
-VOLUME_EXIST=$(oc -n ${VM_NAMESPACE} get vm ${VM_NAME} -o jsonpath='{.spec.template.spec.volumes[*].name}' | { grep -c "${VM_NAME}-bootiso" || true; })
+VOLUME_EXIST=$(oc -n ${VM_NAMESPACE} get vm ${VM_NAME} --insecure-skip-tls-verify=true -o jsonpath='{.spec.template.spec.volumes[*].name}' | { grep -c "${VM_NAME}-bootiso" || true; })
 if [ $? -ne 0 ]; then
   echo "Failed to get VM volumes."
   exit 1
 fi
 
 if [ ${VOLUME_EXIST} -eq 0 ]; then
-  oc -n ${VM_NAMESPACE} patch vm ${VM_NAME} --patch-file /tmp/${VM_NAME}.patch --type json
+  oc -n ${VM_NAMESPACE} patch vm ${VM_NAME} --insecure-skip-tls-verify=true --patch-file /tmp/${VM_NAME}.patch --type json
   if [ $? -eq 0 ]; then
     echo "Volume added to the VM"
   else
@@ -181,7 +181,7 @@ else
 fi
 
 # We get the number of disks, since we need to delete the one we just added to fix the config
-NUM_DISK=$(oc -n ${VM_NAMESPACE} get vm ${VM_NAME} -o jsonpath='{.spec.template.spec.domain.devices.disks[*].name}' | tr " " ";" | { grep -o ";" || true; } | wc -l)
+NUM_DISK=$(oc -n ${VM_NAMESPACE} get vm ${VM_NAME} --insecure-skip-tls-verify=true -o jsonpath='{.spec.template.spec.domain.devices.disks[*].name}' | tr " " ";" | { grep -o ";" || true; } | wc -l)
 if [ $? -ne 0 ]; then
   echo "Failed to get VM disks."
   exit 1
@@ -204,14 +204,14 @@ cat <<EOF > /tmp/${VM_NAME}.patch
 EOF
 
 # Add it to VM object if it doesn't exist
-DISK_EXIST=$(oc -n ${VM_NAMESPACE} get vm ${VM_NAME} -o jsonpath='{.spec.template.spec.domain.devices.disks[*].name}' | { grep -c "${VM_NAME}-bootiso" || true; })
+DISK_EXIST=$(oc -n ${VM_NAMESPACE} get vm ${VM_NAME} --insecure-skip-tls-verify=true -o jsonpath='{.spec.template.spec.domain.devices.disks[*].name}' | { grep -c "${VM_NAME}-bootiso" || true; })
 if [ $? -ne 0 ]; then
   echo "Failed to get VM volumes."
   exit 1
 fi
 
 if [ ${DISK_EXIST} -eq 0 ]; then
-  oc -n ${VM_NAMESPACE} patch vm ${VM_NAME} --patch-file /tmp/${VM_NAME}.patch --type json
+  oc -n ${VM_NAMESPACE} patch vm ${VM_NAME} --insecure-skip-tls-verify=true --patch-file /tmp/${VM_NAME}.patch --type json
   if [ $? -eq 0 ]; then
     echo "Disk added to the VM"
   else
