@@ -38,6 +38,11 @@ if echo "${ISO}" | grep -q https://; then
   IS_HTTPS=true
 fi
 
+if oc -n "${VM_NAMESPACE}" get pvc "${VM_NAME}-bootiso" --insecure-skip-tls-verify=true; then
+  echo "PVC already exists."
+  exit 0
+fi
+
 curl -k "${ISO}" -o /tmp/test.iso
 
 # we need to poweroff the VM if it's running
